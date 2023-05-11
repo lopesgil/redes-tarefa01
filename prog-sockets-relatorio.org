@@ -1,0 +1,151 @@
+#+title: Programação com Sockets - Relatório
+#+author: Gilberto Lopes Inácio Filho - 115173699
+#+language: pt-br
+#+options: toc:nil
+#+options: date:nil
+#+latex_header: \usepackage{float}
+
+* Códigos implementados
+#+caption: Servidor UDP
+#+name: COD:SUDP
+#+include: "./server_udp.py" src python
+
+#+caption: Cliente UDP
+#+name: COD:CUDP
+#+include: "./client_udp.py" src python
+
+#+caption: Servidor TCP
+#+name: COD:STCP
+#+include: "./server_tcp.py" src python
+
+#+caption: Cliente TCP
+#+name: COD:CTCP
+#+include: "./client_tcp.py" src python
+
+Os códigos [[COD:SUDP]] e [[COD:CUDP]] se referem respectivamente ao servidor e o
+cliente com comunicação via UDP. Os códigos [[COD:STCP]] e [[COD:CTCP]] são referentes
+respectivamente ao servidor e cliente com comunicação via TCP.
+* Análises dos testes
+** 1.1
+:PROPERTIES:
+:UNNUMBERED: notoc
+:END:
+O endereço IP associado ao socket do servidor no código foi a string vazia.
+Esta forma especial permite que se vincule o socket a todas as
+interfaces disponíveis, como ~localhost~, o ~hostname~ etc. Este
+comportamento só é compatível com endereços IPv4.
+
+O cliente envia a mensagem ou solicita a conexão usando o nome ~localhost~.
+Se a comunicação estivesse sendo efetuada entre máquinas distintas, seria
+necessário usar o endereço IP ou um nome de domínio público associado ao
+servidor.
+** 1.2
+:PROPERTIES:
+:UNNUMBERED: notoc
+:END:
+A porta usada foi a 9090. Embora o TCP e o UDP aceitem portas na faixa entre
+0 e 65535, a IANA (/Internet Assigned Numbers Authority/) considera as
+portas entre 0 e 1023 "bem-conhecidas", e o seu uso costuma ser reservado
+por convenãço.
+** 2.1
+:PROPERTIES:
+:UNNUMBERED: notoc
+:END:
+O programa lança o erro
+~ConnectionRefusedError: [Errno 111] Connection refused~. Isso acontece
+porque o cliente tenta estabelecer uma conexão TCP em ~localhost:9090~, mas
+não há nenhum processo escutando vinculado a esta porta no momento.
+** 2.2
+:PROPERTIES:
+:UNNUMBERED: notoc
+:END:
+O programa não funciona como esperado, mas não lança erros. A diferença
+ocorre porque o cliente não procura estabelecer uma conexão, ele apenas
+transmite uma mensagem com um endereço associado para as camadas mais baixas
+na pilha de protocolos. Como o UDP não fornece nenhuma garantia de entrega
+confiável da mensagem, ela apenas falha silenciosamente. Após isso, o
+programa fica preso aguardando uma resposta do servidor, que nunca chega.
+** 2.3
+:PROPERTIES:
+:UNNUMBERED: notoc
+:END:
+Ambos os servidores, TCP e UDP, executam normalmente, sendo vinculados às
+portas definidas em seu código. Já os clientes apresentam comportamento
+semelhante aos anteriormente descritos, uma vez que na prática estão
+procurando se comunicar com processos que não se encontram "no lugar
+estabelecido", ou seja, vinculados à porta definida no código do cliente.
+** 3.2
+:PROPERTIES:
+:UNNUMBERED: notoc
+:END:
+*** UDP
+A comunicação entre os processos via UDP foi bem simples, como pode ser
+visto nas imagens disponibilizadas. Não há etapa de conexão, ao invés
+disso o cliente começa imediatamente a mandar mensagens e receber
+respostas do servidor. Também não há nenhum mecanismo de /ACK/, já que o
+UDP não oferece garantia de transferência confiável de dados. Também será
+possível notar posteriormente a diferença de complexidade entre os
+cabeçalhos UDP e TCP, com o primeiro sendo notavelmente mais simples.
+
+#+caption: Mensagem de cliente para servidor via UDP
+#+name: fig:UDP-C2S
+[[./imgs/udp_02_c2s.png]]
+
+Na figura [[fig:UDP-C2S]] podemos ver um exemplo de mensagem enviada do
+cliente para o servidor. Podemos ver a porta de origem que foi atribuída
+pelo sistema operacional, 60054. A porta destino, atribuída ao servidor em
+seu código e referenciada no código do cliente, é 9090. O tamanho total
+do quadro é de 46 bytes, com 4 bytes sendo referentes aos dados da
+mensagem e o restante aos cabeçalhos. Ainda é possível ver no final da
+captura os bytes decodificados da mensagem enviada, "=rede=".
+
+#+caption: Resposta de servidor para cliente via UDP
+#+name: fig:UDP-S2C
+[[./imgs/udp_02_s2c.png]]
+
+A figura [[fig:UDP-S2C]] representa a resposta correspondente do servidor ao
+cliente, com as portas em posição contrária, e o tamanho e conteúdo dos
+dados da mensagem correspondentes.
+*** TCP
+#+caption: Transmissões entre processos via TCP
+#+name: fig:TCP-BASE
+[[./imgs/tcp_base.png]]
+
+Na execução dos processos comunicantes via TCP, a porta definida no código
+para o servidor foi novamente a 9090, e a atribuída ao cliente pelo
+sistema operacional foi a 39624. Com estas informações é possível
+identificar as transmissões feitas a partir do cliente e as do servidor.
+
+Quando a comunicação é feita via TCP, o primeiro passo é estabelecer a
+conexão. Na figura [[fig:TCP-BASE]] podemos ver nas três primeiras linhas o
+/handshake/ em três passos realizado para isto, constituído por um /SYN/
+na linha 1 enviado pelo cliente, um /ACK/ respondido pelo servidor em
+conjunto com um /SYN/ próprio, ambos na linha 2, e um /ACK/ final
+respondido pelo cliente na linha 3. Também é possível ver nas outras
+transferências o /ACK/ como instrumento geral usado para garantir que a
+mensagem foi entregue.
+
+#+caption: Mensagem de cliente para servidor via TCP
+#+name: fig:TCP-C2S
+[[./imgs/tcp_01_c2s.png]]
+
+A figura [[fig:TCP-C2S]] exemplifica uma mensagem feita por um cliente para o
+servidor. É possível observar que o cabeçalho TCP é significativamente
+mais complexo do que o UDP, mas continua fazendo referência às portas de
+origem e destino, além do tamanho da mensagem. Além disso, também continua
+sendo possível identificar os dados da mensagem "=rede=" ao final da
+captura.
+
+A figura [[fig:TCP-S2C]] ilustra a resposta correspondente do servidor, com
+os dados correspondentes como portas, dados da mensagem e tamanho
+identificáveis da mesma maneira.
+
+#+caption: Resposta de servidor para cliente via TCP
+#+name: fig:TCP-S2C
+[[./imgs/tcp_01_s2c.png]]
+
+Ao final do log de captura exibido na figura [[fig:TCP-BASE]], também é
+possível ver o processo de encerramento da conexão, consistindo em um
+/FIN/ enviado pelo cliente, um /ACK/ respondido pelo servidor em conjunto
+com um /FIN/ próprio, e um /FIN/ final respondido pelo cliente,
+confirmando o término da conexão.
